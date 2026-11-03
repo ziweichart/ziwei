@@ -102,7 +102,7 @@ const WORDS = {
   subtitle: "網頁版",               // small grey words after the title (leave "" for none)
   sampleTag: "示例盤",              // tag shown while the sample chart is on
   sampleName: "示例",               // name on the sample chart (leave "" for none)
-  chartHint: "點一個宮，框出這個大運；再點一次取消。手機橫放，命盤會大一點。",
+  chartHint: "點一個宮，框出這個大運。宮干：電腦可直接拖；手機先點宮干，再點它化祿所在的宮。點橙色遁干可取消。",
   formHint: "有時間和地點時，用真太陽時定時辰。香港、中國、台灣等 +8 地區用官方農曆；其他地方用出生地農曆。斗數不用節氣：年干支跟農曆年，月干支用五虎遁。",
   goButton: "起盤",
 };
@@ -131,10 +131,12 @@ const SHOW = {
       <button type="button" class="pill" id="tCs" aria-pressed="false">長生十二神</button>
       <button type="button" class="pill" id="tYears" aria-pressed="false">大限年份</button>
       <button type="button" class="pill" id="saveImg">存圖</button>
+      <button type="button" class="pill" id="clearDrag">清除宮干</button>
       <span class="sep"></span>
       <span class="example" id="exampleTag">示例盤</span>
     </div>
     <div class="chart-box" id="chartBox"></div>
+    <div class="err" id="dragMsg" role="status" style="color:#D2691E"></div>
     <p class="hint" id="wChartHint"></p>
   </section>
 
@@ -559,7 +561,7 @@ function render(c, view) {
   // 1. 宮 frames, bottom line, 宮干, 特質, 五行局
   for (let i = 0; i < 12; i++) {
     const h = c.houses[i], { g } = st[i], { px, py } = g;
-    out.push(`<rect x="${px}" y="${py}" width="${W}" height="${H}" fill="${view.dayun >= 0 && plan[view.dayun].house === i ? "#FFFFFF" : "#FFFFFF"}" stroke="#000" stroke-width="1" data-h="${i}"/>`);
+    out.push(`<rect x="${px}" y="${py}" width="${W}" height="${H}" fill="${view.dayun >= 0 && plan[view.dayun].house === i ? "#FFFFFF" : "#FFFFFF"}" stroke="#000" stroke-width="1"/>`);
     const parts = [h.zhi, h.name, decadeText(h)].filter(Boolean);
     const left = g.x(8), right = h.shen ? g.x(0) - 2 : g.x(0) + G, sep = "｜";
     let size = FS;
@@ -573,7 +575,9 @@ function render(c, view) {
       x += textW(p, size, h.life && k === 1);
     });
     if (h.shen) out.push(T_(g.x(0), y, "身"));
-    out.push(T_(g.x(8), g.y(6), h.gan));
+    const dragged = (view.drops || {})[i];
+    if (view.sel === i) out.push(`<rect x="${(g.x(8) - 2).toFixed(1)}" y="${(g.y(6) - FS).toFixed(1)}" width="${FS + 4}" height="${FS + 5}" rx="3" fill="#FFE2C6" stroke="${ORANGE}"/>`);
+    out.push(T_(g.x(8), g.y(6), h.gan, dragged || view.sel === i ? { fill: ORANGE, bold: true } : {}));
     if (h.ch && SHOW.traits) out.push(T_(g.x(4), g.y(3), h.ch, { bold: true }));
     out.push(T_(g.x(8), g.y(3), NUM_CN[h.wsj]));
   }
@@ -605,6 +609,10 @@ function render(c, view) {
     const h = c.houses[i], s = st[i], cs = view.cs ? h.cs : null;
     if (cs) { const sz = Math.max(8, FS * 0.85); out.push(T_(s.g.x(0) + G - textW(cs, sz), s.g.y(6), cs, { size: sz, fill: CS_TEAL })); }
     const marks = SHOW.marks ? h.sz.slice() : [];
+    for (const from in (view.drops || {})) { // a dragged 宮干: its 四化, once per drag, in the 命主 colour (setSzHuaCount)
+      const gan = GAN.indexOf(c.houses[from].gan);
+      for (let n = 0; n < view.drops[from].n; n++) for (let k = 0; k < 4; k++) { const star = c.stars.find(x => x.name === SIHUA[gan][k]); if (star && star.house === i) marks.push([k, ORANGE]); }
+    }
     if (SHOW.marks && view.nian && c.cur) for (let k = 0; k < 4; k++) { const star = c.stars.find(x => x.name === SIHUA[c.cur.gz[0]][k]); if (star && star.house === i) marks.push([k, BLUE, true]); }
     marks.sort((a, b) => a[0] - b[0]);
     let n = 0;
@@ -641,8 +649,20 @@ function render(c, view) {
     };
     cells.forEach((ch, k) => { const [x, y] = cellAt(k + 1); out.push(T_(x, y, ch, { fill: e.colour })); });
   }
-  // tap targets
+  // 遁干: the dragged 干 written in the 宮 it was dropped on (tap it to take one off)
+  const dg = [];
+  for (const from in (view.drops || {})) {
+    const d = view.drops[from], s = st[d.to];
+    let col = 7; while (col > 1 && (s.used[col][4] || s.used[col][5])) col--;
+    s.used[col][4] = s.used[col][5] = true;
+    const label = c.houses[from].gan + (d.n > 1 ? "×" + d.n : "");
+    out.push(T_(s.g.x(col), s.g.y(5), label, { fill: ORANGE, bold: true }));
+    dg.push(`<rect x="${(s.g.x(col) - 4).toFixed(1)}" y="${(s.g.y(5) - FS - 3).toFixed(1)}" width="${FS + 12}" height="${FS + 8}" fill="transparent" data-dg="${from}" style="cursor:pointer"/>`);
+  }
+  // tap targets: 宮 (大運 / drop), then 宮干 and 遁干 on top
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${g.px}" y="${g.py}" width="${W}" height="${H}" fill="transparent" data-h="${i}" style="cursor:pointer"/>`); }
+  for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${(g.x(8) - 6).toFixed(1)}" y="${(g.y(6) - FS - 4).toFixed(1)}" width="${FS + 12}" height="${FS + 10}" fill="transparent" data-gan="${i}" style="cursor:grab;touch-action:none"/>`); }
+  out.push(...dg);
   out.push("</svg>");
   return out.join("");
 }
@@ -746,7 +766,7 @@ function drawCentre(out, c, view) {
 
 // ---------------------------------------------------------------- the form
 const $ = id => document.getElementById(id);
-const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, chart: null, view: null, example: true };
+const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, chart: null, view: null, example: true };
 const HOURS = ["子 23-01", "丑 01-03", "寅 03-05", "卯 05-07", "辰 07-09", "巳 09-11", "午 11-13", "未 13-15", "申 15-17", "酉 17-19", "戌 19-21", "亥 21-23"];
 $("hour").innerHTML = `<option value="">—</option>` + HOURS.map((h, i) => `<option value="${i}">${h}</option>`).join("");
 function press(a, b, on) { $(a).setAttribute("aria-pressed", on); if (b) $(b).setAttribute("aria-pressed", !on); }
@@ -875,7 +895,7 @@ function build() {
 }
 function draw() {
   if (!state.chart) return;
-  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun });
+  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel });
   $("chartBox").innerHTML = render(state.chart, v);
 }
 function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; draw(); }
@@ -887,7 +907,7 @@ for (let i = 0; i < 4; i++) for (const id of ["r" + i, "ry" + i]) $(id).addEvent
   draw();
   try { localStorage.setItem("jianwei-web-input", JSON.stringify(collect())); } catch (e) { }
 });
-$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
+$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
 function setCur(v) { $("cur").value = v; $("cur2").value = v; rebuildKeepDayun(); }
 $("cur2").addEventListener("change", () => setCur($("cur2").value));
 $("curPrev").onclick = () => setCur((+$("cur2").value || new Date().getFullYear()) - 1);
@@ -917,7 +937,53 @@ $("saveImg").onclick = () => {
 $("shotShare").onclick = () => { if (state.shotFile) navigator.share({ files: [state.shotFile] }).catch(() => { }); };
 $("shotClose").onclick = () => { $("shot").hidden = true; };
 $("shot").addEventListener("click", e => { if (e.target === $("shot")) $("shot").hidden = true; }); toggle("tAll", "all", true); toggle("tCs", "cs"); toggle("tYears", "years");
+// ---- moving a 宮干 (見微's drag): drag it on a computer, or tap it then tap the 宮 on a phone.
+// It lands only on the 宮 of the star its 干 makes 化祿, as in 見微; its 四化 then show in orange.
+function say(msg) { $("dragMsg").textContent = msg || ""; }
+function dropGan(from, to) {
+  const c = state.chart, gan = GAN.indexOf(c.houses[from].gan), lu = c.stars.find(x => x.name === SIHUA[gan][0]);
+  if (!lu) return;
+  if (to !== lu.house) { say(`${GAN[gan]}干化祿是${lu.name}，在${ZHI[lu.house]}宮：要放到${ZHI[lu.house]}宮。`); return; }
+  const d = state.drops[from] || (state.drops[from] = { to, n: 0 });
+  d.n++; say(`${ZHI[from]}宮${GAN[gan]}干 → ${ZHI[to]}宮：${SIHUA[gan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
+}
+function takeOff(from) { const d = state.drops[from]; if (!d) return; if (--d.n <= 0) delete state.drops[from]; say(""); }
+let drag = null;
+const ghost = document.createElement("div");
+ghost.style.cssText = "position:fixed;z-index:30;pointer-events:none;font:700 22px var(--f-chart);color:#D2691E;transform:translate(-50%,-120%)";
+ghost.hidden = true; document.body.appendChild(ghost);
+$("chartBox").addEventListener("pointerdown", e => {
+  const t = e.target.closest("[data-gan]"); if (!t || !state.chart) return;
+  e.preventDefault();
+  drag = { from: +t.dataset.gan, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+  try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { }
+});
+$("chartBox").addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = state.chart.houses[drag.from].gan; ghost.hidden = false; }
+  if (drag.moved) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
+});
+$("chartBox").addEventListener("pointerup", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null; ghost.hidden = true;
+  if (d.moved) {
+    const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-dg]") : null;
+    const to = h ? +(h.dataset.h ?? h.dataset.gan ?? state.drops[h.dataset.dg]?.to) : -1;
+    if (to >= 0 && $("chartBox").contains(h)) dropGan(d.from, to); else takeOff(d.from); // dragged off the chart: one comes off
+    state.sel = null;
+  } else {
+    state.sel = state.sel === d.from ? null : d.from;
+    say(state.sel == null ? "" : `已選${ZHI[d.from]}宮${state.chart.houses[d.from].gan}干：點它化祿所在的宮。`);
+  }
+  state.skipUntil = Date.now() + 350; draw();
+});
+$("chartBox").addEventListener("pointercancel", () => { drag = null; ghost.hidden = true; });
+$("clearDrag").onclick = () => { state.drops = {}; state.sel = null; say(""); draw(); };
 $("chartBox").addEventListener("click", e => {
+  if (Date.now() < (state.skipUntil || 0)) return;
+  const dgt = e.target.closest("[data-dg]");
+  if (dgt) { takeOff(+dgt.dataset.dg); draw(); return; }
+  if (state.sel != null) { const t2 = e.target.closest("[data-h]"); if (t2) { dropGan(state.sel, +t2.dataset.h); state.sel = null; draw(); } return; }
   const t = e.target.closest("[data-h]"); if (!t || !state.chart) return;
   const h = +t.dataset.h, plan = dayunPlan(state.chart, state.view.y), k = plan.findIndex(p => p.house === h);
   state.dayun = state.dayun === k ? -1 : k; draw();
