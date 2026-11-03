@@ -102,7 +102,8 @@ const WORDS = {
   subtitle: "網頁版",               // small grey words after the title (leave "" for none)
   sampleTag: "示例盤",              // tag shown while the sample chart is on
   sampleName: "示例",               // name on the sample chart (leave "" for none)
-  chartHint: "點一個宮，框出這個大運。宮干：電腦可直接拖；手機先點宮干，再點它化祿所在的宮。點橙色遁干可取消。",
+  chartHint: "點一個宮，框出這個大運。宮干：電腦可直接拖；手機先點宮干，再點它化祿所在的宮。點橙色遁干可取消。入卦者的遁干：拖（或點）邊上入卦的年干到任何一個宮；點那個遁干可取消。",
+  chartHintPublic: "點一個宮，框出這個大運。",   // hint on the public site (no how-to)
   formHint: "有時間和地點時，用真太陽時定時辰。香港、中國、台灣等 +8 地區用官方農曆；其他地方用出生地農曆。斗數不用節氣：年干支跟農曆年，月干支用五虎遁。",
   goButton: "起盤",
 };
@@ -110,6 +111,8 @@ const WORDS = {
 const SHOW = {
   marks: false,       // ○□△● on the chart (false = hidden)
   dayunYears: false,
+  howTo: false,        // how-to words for dragging (public site: false)
+  students: false,     // 入卦者遁干 + 顯示父母資料 (public site: false)
   traits: false,      // the bold digits in each 宮 (特質符號) (false = hidden)  // the ten 流年 years written in the 宮 when a 大運 is chosen (false = hidden)
 };
 </script>
@@ -130,6 +133,7 @@ const SHOW = {
       <button type="button" class="pill" id="tAll" aria-pressed="false">全部星曜</button>
       <button type="button" class="pill" id="tCs" aria-pressed="false">長生十二神</button>
       <button type="button" class="pill" id="tYears" aria-pressed="false">大限年份</button>
+      <button type="button" class="pill" id="tParents" aria-pressed="true">顯示父母資料</button>
       <button type="button" class="pill" id="saveImg">存圖</button>
       <button type="button" class="pill" id="clearDrag">清除宮干</button>
       <span class="sep"></span>
@@ -593,7 +597,7 @@ function render(c, view) {
     if (sihua) out.push(T_(s.g.x(p.x), s.g.y(p.y + 2), sihua, o));
   };
   for (const s of c.stars) drawStar(s.house, s.name, s.sihua, s.level, s.colour, s.bold);
-  for (const e of placed) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
+  if (view.parents) for (const e of placed) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
     drawStar(T.LuTsuen[e.gz[0]], "祿存", null, 1, e.colour, false);
     drawStar(T.ChingYang[e.gz[0]], "擎羊", null, 2, e.colour, false);
     drawStar(T.TuoLuo[e.gz[0]], "陀羅", null, 2, e.colour, false);
@@ -612,6 +616,11 @@ function render(c, view) {
     for (const from in (view.drops || {})) { // a dragged 宮干: its 四化, once per drag, in the 命主 colour (setSzHuaCount)
       const gan = GAN.indexOf(c.houses[from].gan);
       for (let n = 0; n < view.drops[from].n; n++) for (let k = 0; k < 4; k++) { const star = c.stars.find(x => x.name === SIHUA[gan][k]); if (star && star.house === i) marks.push([k, ORANGE]); }
+    }
+    for (const key in (view.rdrops || {})) { // an 入卦 person's 遁干: its 四化 in their colour, once per drop
+      const [ri, rh] = key.split(":").map(Number), e = placed.find(x => x.i === ri); if (!e) continue;
+      const dgan = ganIdx(WU_HU[e.gz[0] % 5][rh]);
+      for (let n = 0; n < view.rdrops[key]; n++) for (let k = 0; k < 4; k++) { const star = c.stars.find(x => x.name === SIHUA[dgan][k]); if (star && star.house === i) marks.push([k, e.colour]); }
     }
     if (SHOW.marks && view.nian && c.cur) for (let k = 0; k < 4; k++) { const star = c.stars.find(x => x.name === SIHUA[c.cur.gz[0]][k]); if (star && star.house === i) marks.push([k, BLUE, true]); }
     marks.sort((a, b) => a[0] - b[0]);
@@ -636,7 +645,7 @@ function render(c, view) {
   }
   // 入卦 labels on the border beside the 宮 of the person's year 地支: label (2 characters), ︰, 干支 (ASTBorder)
   const PLACE_OF = { 5: [0, 8], 6: [1], 7: [2], 8: [3, 12], 2: [4, 11], 1: [5], 0: [6], 11: [7, 15], 4: [9], 3: [10], 9: [13], 10: [14] };
-  const taken = {};
+  const taken = {}, rg = [];
   for (const e of placed) {
     const opts = PLACE_OF[e.gz[1]], b = opts.find(p => !taken[p]) ?? opts[0];
     const second = !!taken[b] && opts.length === 1; taken[b] = (taken[b] || 0) + 1;
@@ -647,7 +656,10 @@ function render(c, view) {
       if (b < 12) return [MX - G - 4 + (second ? G / 2 : 0), MY + H * (b - 8) + 6 + G * k];
       return [MX + 4 * W + 4 - (second ? G / 2 : 0), MY + H * (b - 12) + 6 + G * k];
     };
-    cells.forEach((ch, k) => { const [x, y] = cellAt(k + 1); out.push(T_(x, y, ch, { fill: e.colour })); });
+    const ganK = cells.length - 1; // the 干 cell (k from 1)
+    if (view.rsel === e.i) { const [x, y] = cellAt(ganK); out.push(`<rect x="${(x - 2).toFixed(1)}" y="${(y - FS).toFixed(1)}" width="${FS + 4}" height="${FS + 5}" rx="3" fill="#FFF3B0" stroke="${e.colour}"/>`); }
+    cells.forEach((ch, k) => { const [x, y] = cellAt(k + 1); out.push(T_(x, y, ch, { fill: e.colour, bold: view.rsel === e.i && k + 1 === ganK })); });
+    if (SHOW.students) { const [x, y] = cellAt(ganK); rg.push(`<rect x="${(x - 5).toFixed(1)}" y="${(y - FS - 4).toFixed(1)}" width="${FS + 10}" height="${FS + 10}" fill="transparent" data-rg="${e.i}" style="cursor:grab;touch-action:none"/>`); }
   }
   // 遁干: the dragged 干 written in the 宮 it was dropped on (tap it to take one off)
   const dg = [];
@@ -659,10 +671,18 @@ function render(c, view) {
     out.push(T_(s.g.x(col), s.g.y(5), label, { fill: ORANGE, bold: true }));
     dg.push(`<rect x="${(s.g.x(col) - 4).toFixed(1)}" y="${(s.g.y(5) - FS - 3).toFixed(1)}" width="${FS + 12}" height="${FS + 8}" fill="transparent" data-dg="${from}" style="cursor:pointer"/>`);
   }
+  for (const key in (view.rdrops || {})) {
+    const [ri, rh] = key.split(":").map(Number), e = placed.find(x => x.i === ri); if (!e) continue;
+    const s = st[rh], n = view.rdrops[key];
+    let col = 7; while (col > 1 && (s.used[col][4] || s.used[col][5])) col--;
+    s.used[col][4] = s.used[col][5] = true;
+    out.push(T_(s.g.x(col), s.g.y(5), WU_HU[e.gz[0] % 5][rh] + (n > 1 ? "×" + n : ""), { fill: e.colour, bold: true }));
+    dg.push(`<rect x="${(s.g.x(col) - 4).toFixed(1)}" y="${(s.g.y(5) - FS - 3).toFixed(1)}" width="${FS + 12}" height="${FS + 8}" fill="transparent" data-rdg="${key}" style="cursor:pointer"/>`);
+  }
   // tap targets: 宮 (大運 / drop), then 宮干 and 遁干 on top
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${g.px}" y="${g.py}" width="${W}" height="${H}" fill="transparent" data-h="${i}" style="cursor:pointer"/>`); }
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${(g.x(8) - 6).toFixed(1)}" y="${(g.y(6) - FS - 4).toFixed(1)}" width="${FS + 12}" height="${FS + 10}" fill="transparent" data-gan="${i}" style="cursor:grab;touch-action:none"/>`); }
-  out.push(...dg);
+  out.push(...dg, ...rg);
   out.push("</svg>");
   return out.join("");
 }
@@ -766,7 +786,7 @@ function drawCentre(out, c, view) {
 
 // ---------------------------------------------------------------- the form
 const $ = id => document.getElementById(id);
-const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, chart: null, view: null, example: true };
+const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, rdrops: {}, rsel: null, parents: true, chart: null, view: null, example: true };
 const HOURS = ["子 23-01", "丑 01-03", "寅 03-05", "卯 05-07", "辰 07-09", "巳 09-11", "午 11-13", "未 13-15", "申 15-17", "酉 17-19", "戌 19-21", "亥 21-23"];
 $("hour").innerHTML = `<option value="">—</option>` + HOURS.map((h, i) => `<option value="${i}">${h}</option>`).join("");
 function press(a, b, on) { $(a).setAttribute("aria-pressed", on); if (b) $(b).setAttribute("aria-pressed", !on); }
@@ -895,7 +915,7 @@ function build() {
 }
 function draw() {
   if (!state.chart) return;
-  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel });
+  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents });
   $("chartBox").innerHTML = render(state.chart, v);
 }
 function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; draw(); }
@@ -903,11 +923,12 @@ function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; d
 // 入卦 boxes redraw the chart as they are typed in (no need to press 起盤)
 for (let i = 0; i < 4; i++) for (const id of ["r" + i, "ry" + i]) $(id).addEventListener("input", () => {
   if (!state.view) return;
+  if (id[1] === "y") { for (const key in state.rdrops) if (key.startsWith(i + ":")) delete state.rdrops[key]; if (state.rsel === i) state.rsel = null; }
   state.view.rugua = [0, 1, 2, 3].map(k => ({ label: $("r" + k).value.trim(), year: (+$("ry" + k).value >= 1850 && +$("ry" + k).value <= 2200) ? +$("ry" + k).value : null }));
   draw();
   try { localStorage.setItem("jianwei-web-input", JSON.stringify(collect())); } catch (e) { }
 });
-$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
+$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
 function setCur(v) { $("cur").value = v; $("cur2").value = v; rebuildKeepDayun(); }
 $("cur2").addEventListener("change", () => setCur($("cur2").value));
 $("curPrev").onclick = () => setCur((+$("cur2").value || new Date().getFullYear()) - 1);
@@ -936,16 +957,24 @@ $("saveImg").onclick = () => {
 };
 $("shotShare").onclick = () => { if (state.shotFile) navigator.share({ files: [state.shotFile] }).catch(() => { }); };
 $("shotClose").onclick = () => { $("shot").hidden = true; };
-$("shot").addEventListener("click", e => { if (e.target === $("shot")) $("shot").hidden = true; }); toggle("tAll", "all", true); toggle("tCs", "cs"); toggle("tYears", "years");
+$("shot").addEventListener("click", e => { if (e.target === $("shot")) $("shot").hidden = true; }); toggle("tAll", "all", true); toggle("tCs", "cs"); toggle("tYears", "years"); toggle("tParents", "parents");
 // ---- moving a 宮干 (見微's drag): drag it on a computer, or tap it then tap the 宮 on a phone.
 // It lands only on the 宮 of the star its 干 makes 化祿, as in 見微; its 四化 then show in orange.
 function say(msg) { $("dragMsg").textContent = msg || ""; }
 function dropGan(from, to) {
   const c = state.chart, gan = GAN.indexOf(c.houses[from].gan), lu = c.stars.find(x => x.name === SIHUA[gan][0]);
   if (!lu) return;
-  if (to !== lu.house) { say(`${GAN[gan]}干化祿是${lu.name}，在${ZHI[lu.house]}宮：要放到${ZHI[lu.house]}宮。`); return; }
+  if (to !== lu.house) { say(SHOW.howTo ? `${GAN[gan]}干化祿是${lu.name}，在${ZHI[lu.house]}宮：要放到${ZHI[lu.house]}宮。` : ""); return; }
   const d = state.drops[from] || (state.drops[from] = { to, n: 0 });
   d.n++; say(`${ZHI[from]}宮${GAN[gan]}干 → ${ZHI[to]}宮：${SIHUA[gan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
+}
+const RU_COL = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"];
+function ruName(i) { const e = state.view.rugua[i], gz = yearGZ(e.year); return (e.label || "入卦" + (i + 1)) + " " + GAN[gz[0]] + ZHI[gz[1]]; }
+function dropRu(i, to) { // 入卦 person's 年干 on a 宮: the 遁干 there by 五虎遁 from their 年干 (見微 addDuenGan); any 宮
+  const e = state.view.rugua[i]; if (!e || !e.year) return;
+  const yg = yearGZ(e.year)[0], dgan = ganIdx(WU_HU[yg % 5][to]), key = i + ":" + to;
+  state.rdrops[key] = (state.rdrops[key] || 0) + 1;
+  say(`${ruName(i)} → ${ZHI[to]}宮遁干${GAN[dgan]}：${SIHUA[dgan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
 }
 function takeOff(from) { const d = state.drops[from]; if (!d) return; if (--d.n <= 0) delete state.drops[from]; say(""); }
 let drag = null;
@@ -953,6 +982,8 @@ const ghost = document.createElement("div");
 ghost.style.cssText = "position:fixed;z-index:30;pointer-events:none;font:700 22px var(--f-chart);color:#D2691E;transform:translate(-50%,-120%)";
 ghost.hidden = true; document.body.appendChild(ghost);
 $("chartBox").addEventListener("pointerdown", e => {
+  const rt = e.target.closest("[data-rg]");
+  if (rt && state.chart) { e.preventDefault(); drag = { r: true, from: +rt.dataset.rg, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { } return; }
   const t = e.target.closest("[data-gan]"); if (!t || !state.chart) return;
   e.preventDefault();
   drag = { from: +t.dataset.gan, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
@@ -960,27 +991,42 @@ $("chartBox").addEventListener("pointerdown", e => {
 });
 $("chartBox").addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.id) return;
-  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = state.chart.houses[drag.from].gan; ghost.hidden = false; }
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = drag.r ? GAN[yearGZ(state.view.rugua[drag.from].year)[0]] : state.chart.houses[drag.from].gan; ghost.style.color = drag.r ? RU_COL[drag.from] : "#D2691E"; ghost.hidden = false; }
   if (drag.moved) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
 });
 $("chartBox").addEventListener("pointerup", e => {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag; drag = null; ghost.hidden = true;
+  if (d.r) {
+    if (d.moved) {
+      const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-dg],[data-rdg]") : null;
+      const to = !h || !$("chartBox").contains(h) ? -1 : h.dataset.rdg ? +h.dataset.rdg.split(":")[1] : +(h.dataset.h ?? h.dataset.gan ?? state.drops[h.dataset.dg]?.to);
+      if (to >= 0) dropRu(d.from, to);
+      state.rsel = null;
+    } else {
+      state.rsel = state.rsel === d.from ? null : d.from; state.sel = null;
+      say(state.rsel == null ? "" : `已選${ruName(d.from)}` + (SHOW.howTo ? "：點一個宮，看它在這個宮的遁干。" : ""));
+    }
+    state.skipUntil = Date.now() + 350; draw(); return;
+  }
   if (d.moved) {
     const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-dg]") : null;
     const to = h ? +(h.dataset.h ?? h.dataset.gan ?? state.drops[h.dataset.dg]?.to) : -1;
     if (to >= 0 && $("chartBox").contains(h)) dropGan(d.from, to); else takeOff(d.from); // dragged off the chart: one comes off
     state.sel = null;
   } else {
-    state.sel = state.sel === d.from ? null : d.from;
-    say(state.sel == null ? "" : `已選${ZHI[d.from]}宮${state.chart.houses[d.from].gan}干：點它化祿所在的宮。`);
+    state.sel = state.sel === d.from ? null : d.from; state.rsel = null;
+    say(state.sel == null ? "" : `已選${ZHI[d.from]}宮${state.chart.houses[d.from].gan}干` + (SHOW.howTo ? "：點它化祿所在的宮。" : ""));
   }
   state.skipUntil = Date.now() + 350; draw();
 });
 $("chartBox").addEventListener("pointercancel", () => { drag = null; ghost.hidden = true; });
-$("clearDrag").onclick = () => { state.drops = {}; state.sel = null; say(""); draw(); };
+$("clearDrag").onclick = () => { state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; say(""); draw(); };
 $("chartBox").addEventListener("click", e => {
   if (Date.now() < (state.skipUntil || 0)) return;
+  const rdt = e.target.closest("[data-rdg]");
+  if (rdt) { const k = rdt.dataset.rdg; if (--state.rdrops[k] <= 0) delete state.rdrops[k]; say(""); draw(); return; }
+  if (state.rsel != null) { const t2 = e.target.closest("[data-h]"); if (t2) { dropRu(state.rsel, +t2.dataset.h); state.rsel = null; draw(); } return; }
   const dgt = e.target.closest("[data-dg]");
   if (dgt) { takeOff(+dgt.dataset.dg); draw(); return; }
   if (state.sel != null) { const t2 = e.target.closest("[data-h]"); if (t2) { dropGan(state.sel, +t2.dataset.h); state.sel = null; draw(); } return; }
@@ -999,7 +1045,7 @@ function fill(o) {
 }
 // wording from WORDS
 document.title = WORDS.title; $("wTitle").textContent = WORDS.title; $("wSub").textContent = WORDS.subtitle; $("wSub").hidden = !WORDS.subtitle;
-$("exampleTag").textContent = WORDS.sampleTag; $("wChartHint").textContent = WORDS.chartHint; $("wFormHint").textContent = WORDS.formHint; $("go").textContent = WORDS.goButton;
+$("exampleTag").textContent = WORDS.sampleTag; $("wChartHint").textContent = SHOW.howTo ? WORDS.chartHint : WORDS.chartHintPublic; if (!SHOW.students) $("tParents").hidden = true; $("wFormHint").textContent = WORDS.formHint; $("go").textContent = WORDS.goButton;
 if (!SHOW.marks) $("tNian").hidden = true;
 // open on a worked example (the 見微 test chart) so the page shows what it does; the viewer's last chart if there is one
 const EXAMPLE = { name: WORDS.sampleName, male: false, solar: true, y: 1963, m: 12, d: 22, time: "15:30", hour: "", place: "香港 Hong Kong", lon: "114.1747", zone: "Asia/Hong_Kong", cur: new Date().getFullYear() };
