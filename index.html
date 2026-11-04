@@ -195,7 +195,7 @@ const SHOW = {
         <div class="pair"><span class="dot" style="background:#00A949"></span><input type="text" id="r0" class="lab" maxlength="3" placeholder="父" aria-label="入卦1 名稱"><input type="number" id="ry0" class="yr" placeholder="年" aria-label="入卦1 年份"></div>
         <div class="pair"><span class="dot" style="background:#DC143C"></span><input type="text" id="r1" class="lab" maxlength="3" placeholder="母" aria-label="入卦2 名稱"><input type="number" id="ry1" class="yr" placeholder="年" aria-label="入卦2 年份"></div>
         <div class="pair"><span class="dot" style="background:#84629E"></span><input type="text" id="r2" class="lab" maxlength="3" aria-label="入卦3 名稱"><input type="number" id="ry2" class="yr" placeholder="年" aria-label="入卦3 年份"></div>
-        <div class="pair"><span class="dot" style="background:#6E6E6E"></span><input type="text" id="r3" class="lab" maxlength="3" aria-label="入卦4 名稱"><input type="number" id="ry3" class="yr" placeholder="年" aria-label="入卦4 年份"></div>
+        <div class="pair"><span class="dot" style="background:#B8860B"></span><input type="text" id="r3" class="lab" maxlength="3" aria-label="入卦4 名稱"><input type="number" id="ry3" class="yr" placeholder="年" aria-label="入卦4 年份"></div>
       </div>
     </div>
     <div class="err" id="err" role="alert"></div>
@@ -546,7 +546,7 @@ function markSvg(type, colour, x, y, nian) {
 }
 
 function render(c, view) {
-  const RU = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"];
+  const RU = ["#00A949", "#DC143C", "#84629E", "#B8860B"];
   const placed = (view.rugua || []).map((e, i) => e && e.year ? { i, label: e.label, year: e.year, gz: yearGZ(e.year), colour: RU[i] } : null).filter(Boolean);
   if (view.lnOn && c.cur) placed.push({ i: 4, label: "", year: c.cur.year, gz: c.cur.gz, colour: BLUE }); // 流年 dragged onto the chart: its 干支 beside its 宮 (見微 setDiffYearBorderText)
   MX = placed.length ? 2 * G : 2; MY = placed.length ? 2 * G + 4 : 2;
@@ -758,7 +758,7 @@ function drawCentre(out, c, view) {
     if (c.yunGZ) out.push(T_(X(12), Y(5), "大", b), T_(X(12), Y(6), "運", b), T_(X(12), Y(8), GAN[c.yunGZ[0]], b), T_(X(12), Y(9), ZHI[c.yunGZ[1]], b));
   }
   // 太歲入卦: label down the column, then the year's 干支 (ASTDiffYear), entries 1-2 top row, 3-4 second row
-  const RU = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"], at = [[15, 3], [16, 3], [15, 9], [16, 9]];
+  const RU = ["#00A949", "#DC143C", "#84629E", "#B8860B"], at = [[15, 3], [16, 3], [15, 9], [16, 9]];
   const rows = [[0, 1], [2, 3]], cells = [1, 1];
   const ru = view.rugua || [];
   rows.forEach((r, k) => { for (const i of r) if (ru[i] && ru[i].label) cells[k] = Math.max(cells[k], Math.min([...ru[i].label].length, 3)); });
@@ -977,7 +977,7 @@ function dropGan(from, to) {
   const d = state.drops[from] || (state.drops[from] = { to, n: 0 });
   d.n++; say(`${ZHI[from]}宮${GAN[gan]}干 → ${ZHI[to]}宮：${SIHUA[gan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
 }
-const RU_COL = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"];
+const RU_COL = ["#00A949", "#DC143C", "#84629E", "#B8860B"];
 function ruEntry(i) { return i === 4 ? (state.lnOn && state.chart.cur ? { label: "流年", year: state.chart.cur.year } : null) : state.view.rugua[i]; }
 function ruName(i) { const e = ruEntry(i), gz = yearGZ(e.year); return (e.label || "入卦" + (i + 1)) + " " + GAN[gz[0]] + ZHI[gz[1]]; }
 function dropRu(i, to) { // 入卦 person's 年干 on a 宮: the 遁干 there by 五虎遁 from their 年干 (見微 addDuenGan); any 宮
