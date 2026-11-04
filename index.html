@@ -111,7 +111,7 @@ const SHOW = {
   marks: false,       // ○□△● on the chart (false = hidden)
   dayunYears: false,
   howTo: false,        // how-to words for dragging (public site: false)
-  students: false,     // 入卦者遁干 + 顯示父母資料 (public site: false)
+  students: true,     // 入卦者遁干 + 顯示父母資料 (public site: false)
   traits: false,      // the bold digits in each 宮 (特質符號) (false = hidden)  // the ten 流年 years written in the 宮 when a 大運 is chosen (false = hidden)
 };
 </script>
@@ -393,7 +393,7 @@ function chart(inp) {
 
   // stars, in 見微's draw order: [name, level, house, colour, bold]
   const stars = [];
-  const tz = d >= 31 ? d - 31 : TZW_INIT[ju][d - 1];
+  const tz0 = d >= 31 ? d - 31 : TZW_INIT[ju][d - 1], tz = inp.tz != null ? inp.tz : tz0; // tz: 紫微's 宮, moved by dragging a star (見微 setStarTzWeiHouse)
   for (const [n, k] of MAJOR) stars.push({ name: n, level: 0, house: T[k][tz], bold: true });
   const at = (n, lvl, table, idx, colour, bold) => ({ name: n, level: lvl, house: table[idx], colour: colour || null, bold: !!bold });
   const minor = {
@@ -467,7 +467,7 @@ function chart(inp) {
   }
   for (const h of houses) h.sz.sort((a, b) => a[0] - b[0]);
   for (const s of stars) houses[s.house].stars.push(s);
-  return { houses, stars, ju, juName: JU_NAME[ju], ming, forward, yg, yz, monthGan, dayGZ, hourGan, yun, yunGZ, cur: curInfo, tz };
+  return { houses, stars, ju, juName: JU_NAME[ju], ming, forward, yg, yz, monthGan, dayGZ, hourGan, yun, yunGZ, cur: curInfo, tz, tz0 };
 }
 
 /** For each 大運 (0 = first): {house, from, to}. The first runs from the birth year (虛歲 1). */
@@ -587,6 +587,7 @@ function render(c, view) {
   // 2. centre
   drawCentre(out, c, view);
   // 3. stars, in 見微's order
+  const stt = [];
   const drawStar = (hi, name, sihua, level, colour, bold) => {
     const s = st[hi], p = nextPoint(s.seq, level);
     if (!p) return;
@@ -594,6 +595,7 @@ function render(c, view) {
     const o = { fill: colour || null, bold };
     out.push(T_(s.g.x(p.x), s.g.y(p.y), name[0], o), T_(s.g.x(p.x), s.g.y(p.y + 1), name[1], o));
     if (sihua) out.push(T_(s.g.x(p.x), s.g.y(p.y + 2), sihua, o));
+    if (level === 0) { if (view.ssel === name) out.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 1).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" rx="3" fill="none" stroke="${ORANGE}" stroke-width="1.5"/>`); stt.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 2).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" fill="transparent" data-star="${name}" style="cursor:grab;touch-action:none"/>`); }
   };
   for (const s of c.stars) drawStar(s.house, s.name, s.sihua, s.level, s.colour, s.bold);
   if (view.parents) for (const e of placed) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
@@ -681,7 +683,7 @@ function render(c, view) {
   // tap targets: 宮 (大運 / drop), then 宮干 and 遁干 on top
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${g.px}" y="${g.py}" width="${W}" height="${H}" fill="transparent" data-h="${i}" style="cursor:pointer"/>`); }
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${(g.x(8) - 6).toFixed(1)}" y="${(g.y(6) - FS - 4).toFixed(1)}" width="${FS + 12}" height="${FS + 10}" fill="transparent" data-gan="${i}" style="cursor:grab;touch-action:none"/>`); }
-  out.push(...dg, ...rg);
+  out.push(...stt, ...dg, ...rg);
   out.push("</svg>");
   return out.join("");
 }
@@ -763,6 +765,8 @@ function drawCentre(out, c, view) {
       out.push(T_(x, yb + G, GAN[gz[0]], ob), T_(x, yb + 2 * G, ZHI[gz[1]], ob));
     }
   });
+  // 卦象: the stars were moved by hand (見微 starMovedMarks)
+  if (c.tz0 != null && c.tz !== c.tz0) ["卦", "象"].forEach((ch, k) => out.push(T_(X(two ? 3 : 2), Y(8 + k), ch, o)));
   // name: Chinese down the columns from col 5, English across the middle
   const name = (view.name || "").trim();
   if (name) {
@@ -785,7 +789,7 @@ function drawCentre(out, c, view) {
 
 // ---------------------------------------------------------------- the form
 const $ = id => document.getElementById(id);
-const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, rdrops: {}, rsel: null, parents: true, chart: null, view: null, example: true };
+const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, rdrops: {}, rsel: null, parents: true, tz: null, ssel: null, chart: null, view: null, example: true };
 const HOURS = ["子 23-01", "丑 01-03", "寅 03-05", "卯 05-07", "辰 07-09", "巳 09-11", "午 11-13", "未 13-15", "申 15-17", "酉 17-19", "戌 19-21", "亥 21-23"];
 $("hour").innerHTML = `<option value="">—</option>` + HOURS.map((h, i) => `<option value="${i}">${h}</option>`).join("");
 function press(a, b, on) { $(a).setAttribute("aria-pressed", on); if (b) $(b).setAttribute("aria-pressed", !on); }
@@ -896,7 +900,7 @@ function build() {
   let r;
   try { r = resolve(); } catch (e) { $("err").textContent = e.message; return false; }
   const cur = parseInt($("cur").value, 10);
-  const inp = { y: r.lunar.year, m: r.lunar.month, leap: r.lunar.leap, d: r.lunar.day, hour: r.hour, male: state.male, dayGZ: dayGZofJdn(r.date), cur: cur >= 1900 && cur <= 2100 ? cur : null, all: state.all };
+  const inp = { y: r.lunar.year, m: r.lunar.month, leap: r.lunar.leap, d: r.lunar.day, hour: r.hour, male: state.male, dayGZ: dayGZofJdn(r.date), cur: cur >= 1900 && cur <= 2100 ? cur : null, all: state.all, tz: state.tz };
   state.chart = chart(inp);
   state.input = inp; state.resolved = r;
   const s = fromJdn(r.date);
@@ -914,7 +918,7 @@ function build() {
 }
 function draw() {
   if (!state.chart) return;
-  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents });
+  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents, ssel: state.ssel });
   $("chartBox").innerHTML = render(state.chart, v);
 }
 function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; draw(); }
@@ -927,7 +931,7 @@ for (let i = 0; i < 4; i++) for (const id of ["r" + i, "ry" + i]) $(id).addEvent
   draw();
   try { localStorage.setItem("jianwei-web-input", JSON.stringify(collect())); } catch (e) { }
 });
-$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
+$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.tz = null; state.ssel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
 function setCur(v) { $("cur").value = v; $("cur2").value = v; rebuildKeepDayun(); }
 $("cur2").addEventListener("change", () => setCur($("cur2").value));
 $("curPrev").onclick = () => setCur((+$("cur2").value || new Date().getFullYear()) - 1);
@@ -975,12 +979,32 @@ function dropRu(i, to) { // 入卦 person's 年干 on a 宮: the 遁干 there by
   state.rdrops[key] = (state.rdrops[key] || 0) + 1;
   say(`${ruName(i)} → ${ZHI[to]}宮遁干${GAN[dgan]}：${SIHUA[dgan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
 }
+function houseOf(el) { // the 宮 a tap target belongs to
+  if (el.dataset.h != null) return +el.dataset.h;
+  if (el.dataset.gan != null) return +el.dataset.gan;
+  if (el.dataset.dg != null) return state.drops[el.dataset.dg]?.to ?? -1;
+  if (el.dataset.rdg != null) return +el.dataset.rdg.split(":")[1];
+  if (el.dataset.star != null) { const s = state.chart.stars.find(x => x.name === el.dataset.star); return s ? s.house : -1; }
+  return -1;
+}
+function moveStar(name, to) { // 見微 setStarTzWeiHouse: the whole 紫微/天府 group moves so this star lands in that 宮; off the chart = back to the birth chart
+  const k = MAJOR.find(m => m[0] === name)[1];
+  state.ssel = null;
+  if (to < 0) { state.tz = null; say(""); rebuildKeepDayun(); return; }
+  const tz = T[k].indexOf(to);
+  if (tz < 0) return;
+  state.tz = tz === state.chart.tz0 ? null : tz;
+  say(state.tz == null ? "" : `${name} → ${ZHI[to]}宮`);
+  rebuildKeepDayun();
+}
 function takeOff(from) { const d = state.drops[from]; if (!d) return; if (--d.n <= 0) delete state.drops[from]; say(""); }
 let drag = null;
 const ghost = document.createElement("div");
 ghost.style.cssText = "position:fixed;z-index:30;pointer-events:none;font:700 22px var(--f-chart);color:#D2691E;transform:translate(-50%,-120%)";
 ghost.hidden = true; document.body.appendChild(ghost);
 $("chartBox").addEventListener("pointerdown", e => {
+  const sk = e.target.closest("[data-star]");
+  if (sk && state.chart) { e.preventDefault(); drag = { star: sk.dataset.star, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { } return; }
   const rt = e.target.closest("[data-rg]");
   if (rt && state.chart) { e.preventDefault(); drag = { r: true, from: +rt.dataset.rg, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { } return; }
   const t = e.target.closest("[data-gan]"); if (!t || !state.chart) return;
@@ -990,12 +1014,22 @@ $("chartBox").addEventListener("pointerdown", e => {
 });
 $("chartBox").addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.id) return;
-  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = drag.r ? GAN[yearGZ(state.view.rugua[drag.from].year)[0]] : state.chart.houses[drag.from].gan; ghost.style.color = drag.r ? RU_COL[drag.from] : "#D2691E"; ghost.hidden = false; }
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = drag.star ? drag.star : drag.r ? GAN[yearGZ(state.view.rugua[drag.from].year)[0]] : state.chart.houses[drag.from].gan; ghost.style.color = drag.star ? "#000" : drag.r ? RU_COL[drag.from] : "#D2691E"; ghost.hidden = false; }
   if (drag.moved) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
 });
 $("chartBox").addEventListener("pointerup", e => {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag; drag = null; ghost.hidden = true;
+  if (d.star) {
+    if (d.moved) {
+      const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-star],[data-dg],[data-rdg],[data-rg]") : null;
+      moveStar(d.star, h && $("chartBox").contains(h) ? houseOf(h) : -1);
+    } else {
+      if (state.ssel && state.ssel !== d.star) moveStar(state.ssel, state.chart.stars.find(x => x.name === d.star).house); // second tap on another star: its 宮
+      else { state.ssel = state.ssel === d.star ? null : d.star; state.sel = null; state.rsel = null; say(state.ssel ? `已選${d.star}` : ""); }
+    }
+    state.skipUntil = Date.now() + 350; draw(); return;
+  }
   if (d.r) {
     if (d.moved) {
       const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-dg],[data-rdg]") : null;
@@ -1023,6 +1057,7 @@ $("chartBox").addEventListener("pointercancel", () => { drag = null; ghost.hidde
 $("clearDrag").onclick = () => { state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; say(""); draw(); };
 $("chartBox").addEventListener("click", e => {
   if (Date.now() < (state.skipUntil || 0)) return;
+  if (state.ssel) { const t2 = e.target.closest("[data-h],[data-gan],[data-dg],[data-rdg]"); if (t2) { moveStar(state.ssel, houseOf(t2)); draw(); } return; }
   const rdt = e.target.closest("[data-rdg]");
   if (rdt) { const k = rdt.dataset.rdg; if (--state.rdrops[k] <= 0) delete state.rdrops[k]; say(""); draw(); return; }
   if (state.rsel != null) { const t2 = e.target.closest("[data-h]"); if (t2) { dropRu(state.rsel, +t2.dataset.h); state.rsel = null; draw(); } return; }
