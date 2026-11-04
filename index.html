@@ -548,6 +548,7 @@ function markSvg(type, colour, x, y, nian) {
 function render(c, view) {
   const RU = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"];
   const placed = (view.rugua || []).map((e, i) => e && e.year ? { i, label: e.label, year: e.year, gz: yearGZ(e.year), colour: RU[i] } : null).filter(Boolean);
+  if (view.lnOn && c.cur) placed.push({ i: 4, label: "", year: c.cur.year, gz: c.cur.gz, colour: BLUE }); // 流年 dragged onto the chart: its 干支 beside its 宮 (見微 setDiffYearBorderText)
   MX = placed.length ? 2 * G : 2; MY = placed.length ? 2 * G + 4 : 2;
   const out = [], Wt = MX * 2 + 4 * W, Ht = MY * 2 + 4 * H;
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wt} ${Ht}" font-family='${CHART_FONT.replace(/'/g, "")}' font-size="${FS}" role="img" aria-label="命盤">`);
@@ -598,7 +599,7 @@ function render(c, view) {
     if (level === 0 && view.unlocked) { if (view.ssel === name) out.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 1).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" rx="3" fill="none" stroke="${ORANGE}" stroke-width="1.5"/>`); stt.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 2).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" fill="transparent" data-star="${name}" style="cursor:grab;touch-action:none"/>`); }
   };
   for (const s of c.stars) drawStar(s.house, s.name, s.sihua, s.level, s.colour, s.bold);
-  if (view.parents) for (const e of placed) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
+  if (view.parents) for (const e of placed.filter(x => x.i < 4)) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
     drawStar(T.LuTsuen[e.gz[0]], "祿存", null, 1, e.colour, false);
     drawStar(T.ChingYang[e.gz[0]], "擎羊", null, 2, e.colour, false);
     drawStar(T.TuoLuo[e.gz[0]], "陀羅", null, 2, e.colour, false);
@@ -682,7 +683,7 @@ function render(c, view) {
   }
   // tap targets: 宮 (大運 / drop), then 宮干 and 遁干 on top
   for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${g.px}" y="${g.py}" width="${W}" height="${H}" fill="transparent" data-h="${i}" style="cursor:pointer"/>`); }
-  for (let i = 0; i < 12; i++) { const g = st[i].g; out.push(`<rect x="${(g.x(8) - 6).toFixed(1)}" y="${(g.y(6) - FS - 4).toFixed(1)}" width="${FS + 12}" height="${FS + 10}" fill="transparent" data-gan="${i}" style="cursor:grab;touch-action:none"/>`); }
+  for (let i = 0; i < 12; i++) { if (!view.unlocked && i !== c.yz) continue; const g = st[i].g; out.push(`<rect x="${(g.x(8) - 6).toFixed(1)}" y="${(g.y(6) - FS - 4).toFixed(1)}" width="${FS + 12}" height="${FS + 10}" fill="transparent" data-gan="${i}" style="cursor:grab;touch-action:none"/>`); }
   out.push(...stt, ...dg, ...rg);
   out.push("</svg>");
   return out.join("");
@@ -748,6 +749,11 @@ function drawCentre(out, c, view) {
     const b = { fill: BLUE };
     out.push(fitCell(X(11), Y(6), String(c.cur.year), b));
     out.push(T_(X(11), Y(8), GAN[c.cur.gz[0]], b), T_(X(11), Y(9), ZHI[c.cur.gz[1]], b), T_(X(11), Y(10), "年", b));
+    if (SHOW.students && view.unlocked) {
+      const r = `x="${(X(11) - 4).toFixed(1)}" y="${(Y(8) - FS - 3).toFixed(1)}" width="${FS + 8}" height="${2 * G + 6}"`;
+      if (view.lnOn) out.push(`<rect ${r} rx="3" fill="#E3F0FB"/>`, T_(X(11), Y(8), GAN[c.cur.gz[0]], b), T_(X(11), Y(9), ZHI[c.cur.gz[1]], b));
+      out.push(`<rect ${r} fill="transparent" data-ln="1" style="cursor:grab;touch-action:none"/>`);
+    }
     out.push(fitCell(X(11), Y(12), String(c.cur.age), b), T_(X(11), Y(13), "歲", b));
     if (c.yunGZ) out.push(T_(X(12), Y(5), "大", b), T_(X(12), Y(6), "運", b), T_(X(12), Y(8), GAN[c.yunGZ[0]], b), T_(X(12), Y(9), ZHI[c.yunGZ[1]], b));
   }
@@ -789,7 +795,7 @@ function drawCentre(out, c, view) {
 
 // ---------------------------------------------------------------- the form
 const $ = id => document.getElementById(id);
-const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, rdrops: {}, rsel: null, parents: false, tz: null, ssel: null, chart: null, view: null, example: true };
+const state = { male: true, solarMode: true, leap: false, nian: false, all: false, cs: false, years: false, dayun: -1, drops: {}, sel: null, rdrops: {}, rsel: null, parents: false, lnOn: false, tz: null, ssel: null, chart: null, view: null, example: true };
 const HOURS = ["子 23-01", "丑 01-03", "寅 03-05", "卯 05-07", "辰 07-09", "巳 09-11", "午 11-13", "未 13-15", "申 15-17", "酉 17-19", "戌 19-21", "亥 21-23"];
 $("hour").innerHTML = `<option value="">—</option>` + HOURS.map((h, i) => `<option value="${i}">${h}</option>`).join("");
 function press(a, b, on) { $(a).setAttribute("aria-pressed", on); if (b) $(b).setAttribute("aria-pressed", !on); }
@@ -918,7 +924,7 @@ function build() {
 }
 function draw() {
   if (!state.chart) return;
-  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents, ssel: state.ssel, unlocked: !!state.drops[state.chart.yz] }); // 見微: moving stars and 入卦 遁干 open once the 太歲宮 宮干 is dragged
+  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents, ssel: state.ssel, lnOn: state.lnOn, unlocked: !!state.drops[state.chart.yz] }); // 見微: moving stars and 入卦 遁干 open once the 太歲宮 宮干 is dragged
   $("chartBox").innerHTML = render(state.chart, v);
 }
 function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; draw(); }
@@ -931,8 +937,8 @@ for (let i = 0; i < 4; i++) for (const id of ["r" + i, "ry" + i]) $(id).addEvent
   draw();
   try { localStorage.setItem("jianwei-web-input", JSON.stringify(collect())); } catch (e) { }
 });
-$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.tz = null; state.ssel = null; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
-function setCur(v) { $("cur").value = v; $("cur2").value = v; rebuildKeepDayun(); }
+$("f").addEventListener("submit", e => { e.preventDefault(); state.dayun = -1; state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.tz = null; state.ssel = null; state.lnOn = false; state.example = false; $("exampleTag").hidden = true; $("cur2").value = $("cur").value; build(); if (window.innerWidth < 980) $("chartBox").closest("section").scrollIntoView({ behavior: "smooth", block: "start" }); });
+function setCur(v) { for (const k in state.rdrops) if (k.startsWith("4:")) delete state.rdrops[k]; if (state.rsel === 4) state.rsel = null; $("cur").value = v; $("cur2").value = v; rebuildKeepDayun(); }
 $("cur2").addEventListener("change", () => setCur($("cur2").value));
 $("curPrev").onclick = () => setCur((+$("cur2").value || new Date().getFullYear()) - 1);
 $("curNext").onclick = () => setCur((+$("cur2").value || new Date().getFullYear()) + 1);
@@ -972,9 +978,10 @@ function dropGan(from, to) {
   d.n++; say(`${ZHI[from]}宮${GAN[gan]}干 → ${ZHI[to]}宮：${SIHUA[gan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
 }
 const RU_COL = ["#00A949", "#DC143C", "#84629E", "#6E6E6E"];
-function ruName(i) { const e = state.view.rugua[i], gz = yearGZ(e.year); return (e.label || "入卦" + (i + 1)) + " " + GAN[gz[0]] + ZHI[gz[1]]; }
+function ruEntry(i) { return i === 4 ? (state.lnOn && state.chart.cur ? { label: "流年", year: state.chart.cur.year } : null) : state.view.rugua[i]; }
+function ruName(i) { const e = ruEntry(i), gz = yearGZ(e.year); return (e.label || "入卦" + (i + 1)) + " " + GAN[gz[0]] + ZHI[gz[1]]; }
 function dropRu(i, to) { // 入卦 person's 年干 on a 宮: the 遁干 there by 五虎遁 from their 年干 (見微 addDuenGan); any 宮
-  const e = state.view.rugua[i]; if (!e || !e.year) return;
+  const e = ruEntry(i); if (!e || !e.year) return;
   const yg = yearGZ(e.year)[0], dgan = ganIdx(WU_HU[yg % 5][to]), key = i + ":" + to;
   state.rdrops[key] = (state.rdrops[key] || 0) + 1;
   say(`${ruName(i)} → ${ZHI[to]}宮遁干${GAN[dgan]}：${SIHUA[dgan].map((s, k) => s + "化" + "祿權科忌"[k]).join("、")}`);
@@ -997,12 +1004,15 @@ function moveStar(name, to) { // 見微 setStarTzWeiHouse: the whole 紫微/天�
   say(state.tz == null ? "" : `${name} → ${ZHI[to]}宮`);
   rebuildKeepDayun();
 }
-function takeOff(from) { const d = state.drops[from]; if (!d) return; if (--d.n <= 0) delete state.drops[from]; say(""); }
+function takeOff(from) { const d = state.drops[from]; if (!d) return; if (--d.n <= 0) delete state.drops[from]; say(""); if (!state.drops[state.chart.yz]) relock(); }
+function relock() { const moved = state.tz != null; state.drops = {}; state.rdrops = {}; state.rsel = null; state.ssel = null; state.lnOn = false; state.tz = null; if (moved) rebuildKeepDayun(); }
 let drag = null;
 const ghost = document.createElement("div");
 ghost.style.cssText = "position:fixed;z-index:30;pointer-events:none;font:700 22px var(--f-chart);color:#D2691E;transform:translate(-50%,-120%)";
 ghost.hidden = true; document.body.appendChild(ghost);
 $("chartBox").addEventListener("pointerdown", e => {
+  const lt = e.target.closest("[data-ln]");
+  if (lt && state.chart) { e.preventDefault(); drag = { ln: true, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { } return; }
   const sk = e.target.closest("[data-star]");
   if (sk && state.chart) { e.preventDefault(); drag = { star: sk.dataset.star, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { $("chartBox").setPointerCapture(e.pointerId); } catch (er) { } return; }
   const rt = e.target.closest("[data-rg]");
@@ -1014,12 +1024,18 @@ $("chartBox").addEventListener("pointerdown", e => {
 });
 $("chartBox").addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.id) return;
-  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = drag.star ? drag.star : drag.r ? GAN[yearGZ(state.view.rugua[drag.from].year)[0]] : state.chart.houses[drag.from].gan; ghost.style.color = drag.star ? "#000" : drag.r ? RU_COL[drag.from] : "#D2691E"; ghost.hidden = false; }
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = drag.ln ? GAN[state.chart.cur.gz[0]] + ZHI[state.chart.cur.gz[1]] : drag.star ? drag.star : drag.r ? GAN[yearGZ(ruEntry(drag.from).year)[0]] : state.chart.houses[drag.from].gan; ghost.style.color = drag.ln ? "#0078D4" : drag.star ? "#000" : drag.r ? (drag.from === 4 ? "#0078D4" : RU_COL[drag.from]) : "#D2691E"; ghost.hidden = false; }
   if (drag.moved) { ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px"; }
 });
 $("chartBox").addEventListener("pointerup", e => {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag; drag = null; ghost.hidden = true;
+  if (d.ln) { // drop it on the chart (or tap it) to put the 流年 on the border; again to take it off
+    const el = d.moved ? document.elementFromPoint(e.clientX, e.clientY) : null, onChart = !d.moved || (el && $("chartBox").contains(el) && !el.closest("[data-ln]"));
+    if (onChart) { state.lnOn = d.moved ? true : !state.lnOn; if (!state.lnOn) { for (const k in state.rdrops) if (k.startsWith("4:")) delete state.rdrops[k]; if (state.rsel === 4) state.rsel = null; } }
+    else if (d.moved) { state.lnOn = false; for (const k in state.rdrops) if (k.startsWith("4:")) delete state.rdrops[k]; }
+    say(""); state.skipUntil = Date.now() + 350; draw(); return;
+  }
   if (d.star) {
     if (d.moved) {
       const el = document.elementFromPoint(e.clientX, e.clientY), h = el && el.closest ? el.closest("[data-h],[data-gan],[data-star],[data-dg],[data-rdg],[data-rg]") : null;
@@ -1054,7 +1070,7 @@ $("chartBox").addEventListener("pointerup", e => {
   state.skipUntil = Date.now() + 350; draw();
 });
 $("chartBox").addEventListener("pointercancel", () => { drag = null; ghost.hidden = true; });
-$("clearDrag").onclick = () => { state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.ssel = null; say(""); if (state.tz != null) { state.tz = null; rebuildKeepDayun(); } else draw(); }; // Reset: dragged 干, 入卦 遁干 and moved stars
+$("clearDrag").onclick = () => { state.drops = {}; state.sel = null; state.rdrops = {}; state.rsel = null; state.ssel = null; state.lnOn = false; say(""); if (state.tz != null) { state.tz = null; rebuildKeepDayun(); } else draw(); }; // Reset: dragged 干, 入卦 遁干 and moved stars
 $("chartBox").addEventListener("click", e => {
   if (Date.now() < (state.skipUntil || 0)) return;
   if (state.ssel) { const t2 = e.target.closest("[data-h],[data-gan],[data-dg],[data-rdg]"); if (t2) { moveStar(state.ssel, houseOf(t2)); draw(); } return; }
