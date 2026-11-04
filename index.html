@@ -103,7 +103,7 @@ const WORDS = {
   sampleTag: "示例盤",              // tag shown while the sample chart is on
   sampleName: "示例",               // name on the sample chart (leave "" for none)
   chartHintPublic: "點一個宮，框出這個大運。",   // hint on the public site (no how-to)
-  formHint: "有時間和地點時，用真太陽時定時辰。香港、中國、台灣等 +8 地區用官方農曆；其他地方用出生地農曆。斗數不用節氣：年干支跟農曆年，月干支用五虎遁。",
+  formHint: "",                   // words under the form (leave "" for none)
   goButton: "起盤",
 };
 /* ===== 顯示設定 ===== */
@@ -201,7 +201,7 @@ const SHOW = {
     <div class="err" id="err" role="alert"></div>
     <div class="row"><button type="submit" class="go" id="go">起盤</button></div>
     <div class="facts" id="facts"></div>
-    <p class="hint" id="wFormHint">有時間和地點時，用真太陽時定時辰（同見微一樣）。香港、中國、台灣等 +8 地區用官方農曆；其他地方用出生地農曆。斗數不用節氣：年干支跟農曆年，月干支用五虎遁。</p>
+    <p class="hint" id="wFormHint" hidden></p>
   </form>
 
 </div>
@@ -1079,7 +1079,7 @@ function fill(o) {
 }
 // wording from WORDS
 document.title = WORDS.title; $("wTitle").textContent = WORDS.title; $("wSub").textContent = WORDS.subtitle; $("wSub").hidden = !WORDS.subtitle;
-$("exampleTag").textContent = WORDS.sampleTag; $("wChartHint").textContent = SHOW.howTo ? WORDS.chartHint : WORDS.chartHintPublic; if (!SHOW.students) $("tParents").hidden = true; $("wFormHint").textContent = WORDS.formHint; $("go").textContent = WORDS.goButton;
+$("exampleTag").textContent = WORDS.sampleTag; $("wChartHint").textContent = SHOW.howTo ? WORDS.chartHint : WORDS.chartHintPublic; if (!SHOW.students) $("tParents").hidden = true; $("wFormHint").textContent = WORDS.formHint; $("wFormHint").hidden = !WORDS.formHint; $("go").textContent = WORDS.goButton;
 if (!SHOW.marks) $("tNian").hidden = true;
 // open on a worked example (the 見微 test chart) so the page shows what it does; the viewer's last chart if there is one
 const EXAMPLE = { name: WORDS.sampleName, male: false, solar: true, y: 1963, m: 12, d: 22, time: "15:30", hour: "", place: "香港 Hong Kong", lon: "114.1747", zone: "Asia/Hong_Kong", cur: new Date().getFullYear() };
