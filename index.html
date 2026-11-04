@@ -595,7 +595,7 @@ function render(c, view) {
     const o = { fill: colour || null, bold };
     out.push(T_(s.g.x(p.x), s.g.y(p.y), name[0], o), T_(s.g.x(p.x), s.g.y(p.y + 1), name[1], o));
     if (sihua) out.push(T_(s.g.x(p.x), s.g.y(p.y + 2), sihua, o));
-    if (level === 0) { if (view.ssel === name) out.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 1).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" rx="3" fill="none" stroke="${ORANGE}" stroke-width="1.5"/>`); stt.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 2).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" fill="transparent" data-star="${name}" style="cursor:grab;touch-action:none"/>`); }
+    if (level === 0 && view.unlocked) { if (view.ssel === name) out.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 1).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" rx="3" fill="none" stroke="${ORANGE}" stroke-width="1.5"/>`); stt.push(`<rect x="${(s.g.x(p.x) - 2).toFixed(1)}" y="${(s.g.y(p.y) - FS - 2).toFixed(1)}" width="${FS + 4}" height="${2 * G + 4}" fill="transparent" data-star="${name}" style="cursor:grab;touch-action:none"/>`); }
   };
   for (const s of c.stars) drawStar(s.house, s.name, s.sihua, s.level, s.colour, s.bold);
   if (view.parents) for (const e of placed) { // each 入卦 person's own 祿存 擎羊 陀羅, in their colour (drawEntryLuTsuen)
@@ -660,7 +660,7 @@ function render(c, view) {
     const ganK = cells.length - 1; // the 干 cell (k from 1)
     if (view.rsel === e.i) { const [x, y] = cellAt(ganK); out.push(`<rect x="${(x - 2).toFixed(1)}" y="${(y - FS).toFixed(1)}" width="${FS + 4}" height="${FS + 5}" rx="3" fill="#FFF3B0" stroke="${e.colour}"/>`); }
     cells.forEach((ch, k) => { const [x, y] = cellAt(k + 1); out.push(T_(x, y, ch, { fill: e.colour, bold: view.rsel === e.i && k + 1 === ganK })); });
-    if (SHOW.students) { const [x, y] = cellAt(ganK); rg.push(`<rect x="${(x - 5).toFixed(1)}" y="${(y - FS - 4).toFixed(1)}" width="${FS + 10}" height="${FS + 10}" fill="transparent" data-rg="${e.i}" style="cursor:grab;touch-action:none"/>`); }
+    if (SHOW.students && view.unlocked) { const [x, y] = cellAt(ganK); rg.push(`<rect x="${(x - 5).toFixed(1)}" y="${(y - FS - 4).toFixed(1)}" width="${FS + 10}" height="${FS + 10}" fill="transparent" data-rg="${e.i}" style="cursor:grab;touch-action:none"/>`); }
   }
   // 遁干: the dragged 干 written in the 宮 it was dropped on (tap it to take one off)
   const dg = [];
@@ -918,7 +918,7 @@ function build() {
 }
 function draw() {
   if (!state.chart) return;
-  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents, ssel: state.ssel });
+  const v = Object.assign({}, state.view, { nian: state.nian, cs: state.cs, years: state.years, dayun: state.dayun, drops: state.drops, sel: state.sel, rdrops: state.rdrops, rsel: state.rsel, parents: state.parents, ssel: state.ssel, unlocked: !!state.drops[state.chart.yz] }); // 見微: moving stars and 入卦 遁干 open once the 太歲宮 宮干 is dragged
   $("chartBox").innerHTML = render(state.chart, v);
 }
 function rebuildKeepDayun() { const k = state.dayun; build(); state.dayun = k; draw(); }
