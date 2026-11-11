@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ziweichart.github.io/ziwei/sitemap.xml
