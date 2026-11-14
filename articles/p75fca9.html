@@ -38,6 +38,7 @@ a.post .x { color:var(--muted); font-size:13.5px; line-height:1.6; }
 @media (min-width:600px) { .art figure { float:right; clear:right; width:38%; max-width:none; margin:4px 0 10px 18px; } .art .b::after { content:""; display:block; clear:both; } }
 .nav { display:flex; gap:8px; margin-top:12px; } .nav a { flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; color:var(--ink); text-decoration:none; font-size:14px; line-height:1.5; } .nav a small { display:block; color:var(--muted); font-size:12px; } .nav a.n { text-align:right; } .nav span { flex:1; }
 .cols aside .toc { margin:0 0 10px; }
+.lb { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; padding:max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); cursor:zoom-out; } .lb[hidden] { display:none; } .lb img { max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; background:#fff; box-shadow:0 6px 30px rgba(0,0,0,.5); } .lbX { position:absolute; top:max(12px, env(safe-area-inset-top, 0px)); right:max(12px, env(safe-area-inset-right, 0px)); width:44px; height:44px; border-radius:50%; border:0; background:rgba(255,255,255,.92); color:#222; font-size:22px; cursor:pointer; } .art figure a { cursor:zoom-in; }
 .fab { position:fixed; right:max(16px, env(safe-area-inset-right, 0px)); bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:20; background:var(--accent); color:#fff; border:0; border-radius:999px; padding:10px 16px; font:inherit; font-size:15px; font-weight:700; box-shadow:0 3px 12px rgba(0,0,0,.25); cursor:pointer; }
 .sheet-bg { display:none; } body.sheet .sheet-bg { display:block; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; } body.sheet .fab { display:none; } body.sheet { overflow:hidden; }
 body.sheet .cols aside { position:fixed; left:0; right:0; bottom:0; max-height:78vh; overflow:auto; z-index:31; } body.sheet .cols aside .toc { margin:0; border-radius:16px 16px 0 0; padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); } body.sheet .toc summary { position:sticky; top:0; background:var(--card); }
@@ -58,13 +59,18 @@ body.sheet .cols aside { position:fixed; left:0; right:0; bottom:0; max-height:7
 <p>人生在世，我們的性格必然受父母及其他人互相牽動，所以如何將與自己有重要關係的人結合於命盤解讀之中，才能更加立體地了解、研究一個人的際遇與性格。以上是我經過二十年學習斗數後的一點小小體會。</p></div></article>
 <nav class="nav"><a class="p" href="p3c0252.html"><small>上一篇</small>天府五大優點｜入門篇</a><a class="n" href="pd7d850.html"><small>下一篇</small>斗數論相處｜入門篇</a></nav>
 <a class="all" href="./">← 斗數文章目錄（可搜尋）</a></div></div>
-<button class="fab" id="fab" type="button">☰ 文章目錄</button><div class="sheet-bg" id="sbg"></div>
+<button class="fab" id="fab" type="button">☰ 文章目錄</button><div class="sheet-bg" id="sbg"></div><div class="lb" id="lb" hidden><img id="lbImg" alt=""><button type="button" class="lbX" id="lbX" aria-label="關閉">✕</button></div>
 <script>
 const toc = document.getElementById("toc"), wide = matchMedia("(min-width:800px)");
 if (wide.matches) toc.open = true;
 const closeSheet = () => { document.body.classList.remove("sheet"); toc.open = false; };
 document.getElementById("fab").onclick = () => { document.body.classList.add("sheet"); toc.open = true; const c = toc.querySelector(".cur"); if (c) c.scrollIntoView({block: "center"}); };
 document.getElementById("sbg").onclick = closeSheet;
+const lb = document.getElementById("lb"), lbImg = document.getElementById("lbImg");
+const lbClose = () => { lb.hidden = true; lbImg.src = ""; document.body.style.overflow = ""; };
+document.querySelectorAll(".art figure a").forEach(a => a.addEventListener("click", e => { e.preventDefault(); lbImg.src = a.getAttribute("href"); lbImg.alt = a.querySelector("img").alt; lb.hidden = false; document.body.style.overflow = "hidden"; }));
+lb.addEventListener("click", lbClose);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !lb.hidden) lbClose(); });
 toc.addEventListener("toggle", () => { if (!toc.open && document.body.classList.contains("sheet")) document.body.classList.remove("sheet"); });
 </script>
 <p class="foot">更多分享：<a href="https://www.facebook.com/Jeffziwei/" target="_blank" rel="noopener">Facebook</a> / <a href="https://www.instagram.com/jeff_ziwei/" target="_blank" rel="noopener">Instagram</a> / <a href="https://www.threads.com/@jeff_ziwei" target="_blank" rel="noopener">Threads</a><br>© 2026 謝飛 Jeff · 版權所有，未經許可不得轉載或複製</p>
